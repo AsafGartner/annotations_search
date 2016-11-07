@@ -1,0 +1,294 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Handmade Hero Search</title>
+<style>
+    body {
+        background-color: #222;
+        font-family: sans-serif;
+        color: #ddd;
+        overflow-y: scroll;
+    }
+
+    h2 {
+        text-align: center;
+    }
+
+    #loadingContainer {
+        position: fixed;
+        top: 0;
+        left: 0;
+    }
+
+    .queryContainer {
+        width: 1000px;
+        margin: 15px auto;
+        display: flex;
+        flex-direction: horizontal;
+    }
+
+    .queryContainer label {
+        flex-grow: 0;
+        flex-shrink: 0;
+    }
+
+    #query {
+        flex-grow: 1;
+    }
+
+    #results {
+        width: 800px;
+        margin: 0 auto;
+    }
+
+    .dayContainer {
+        background-color: #161616;
+    }
+
+    .dayContainer:nth-child(2n) {
+        background-color: #303030;
+    }
+
+    .dayName {
+        width: 200px;
+        display: inline-block;
+        vertical-align: top;
+        color: #8A877D;
+        font-size: 12px;
+        line-height: 16px;
+        box-sizing: border-box;
+        padding: 5px;
+    }
+
+    .markerList {
+        display: inline-block;
+        width: 600px;
+        box-sizing: border-box;
+        vertical-align: top;
+    }
+
+    .marker {
+        padding: 10px 5px;
+        cursor: pointer;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .marker:first-child {
+        border: none;
+    }
+
+    .marker b {
+        color: white;
+    }
+
+    .marker:hover {
+        background-color: #444;
+    }
+
+    .notice {
+        text-align: center;
+    }
+
+
+</style>
+</head>
+<body>
+<div id="loadingContainer">
+    <span>Loading annotations:</span>
+    <span id="loadingProgress">Getting list of files...</span>
+</div>
+<h2>Handmade Hero Annotations Search</h2>
+<div class="queryContainer">
+    <label>Query:</label> <input type="text" id="query"></input>
+</div>
+<div id="results">
+</div>
+
+<script>
+var fileListsToLoad = 0;
+var fileListsLoaded = 0;
+
+var itemsToLoad = 0;
+var itemsLoaded = 0;
+var ready = false;
+
+var fileList = [];
+
+var episodes = [];
+
+function fileListLoaded(data) {
+    fileListsLoaded++;
+    var files = [];
+    for (var i = data.data.length-1; i >= 0; --i) {
+        var file = data.data[i];
+        files.push({
+            name: file.name,
+            path: "https://raw.githubusercontent.com/HandmadeCompanion/HandmadeCompanion/master/" + file.path
+        });
+    }
+    addFilesToList(files);
+}
+
+function addFilesToList(files) {
+    fileList = fileList.concat(files);
+    if (fileListsLoaded == fileListsToLoad) {
+        itemsToLoad = fileList.length;
+        for (var i = 0; i < fileList.length; ++i) {
+            addFile(fileList[i].name, fileList[i].path, i);
+        }
+    }
+}
+
+function addFile(name, filepath, idx) {
+    var xhr = new XMLHttpRequest();
+    xhr.addEventListener("load", function() {
+        itemsLoaded++;
+        if (itemsLoaded == itemsToLoad) {
+            document.getElementById("loadingContainer").style.display = "none";
+        } else {
+            document.getElementById("loadingProgress").textContent = itemsLoaded + "/" + itemsToLoad;
+        }
+        var contents = xhr.response;
+
+        var lines = contents.split("\n");
+        var title = null;
+        var videoId = null;
+        var markers = [];
+        var day = name.slice(0, name.indexOf("."));
+        dayParts = day.match(/([a-zA-Z_-]+)([0-9]+)?([a-zA-Z]+)?/);
+        day = dayParts[1].slice(0, 1).toUpperCase() + dayParts[1].slice(1) + (dayParts[2] ? " " + dayParts[2] : "") + (dayParts[3] ? " " + dayParts[3].toUpperCase() : "");
+        var mode = "none";
+        for (var i = 0; i < lines.length; ++i) {
+            var line = lines[i];
+            if (line == "---") {
+                mode = "none";
+            } else if (line.startsWith("title:")) {
+                title = line.slice(7).replace(/"/g, "");
+            } else if (line.startsWith("videoId:")) {
+                videoId = line.slice(9).replace(/"/g, "");
+            } else if (line.startsWith("markers")) {
+                mode = "markers";
+            } else if (mode == "markers") {
+                var match = line.match(/"((\d+):)?(\d+):(\d+)": "(.+)"/);
+                if (match == null) {
+                    console.log(name, line);
+                } else {
+                    var marker = {
+                        totalTime: (match[2] ? parseInt(match[2], 10) : 0) * 60 * 60 + parseInt(match[3], 10) * 60 + parseInt(match[4], 10),
+                        text: match[5].replace(/\\"/g, "\"")
+                    }
+                    markers.push(marker);
+                }
+            }
+        }
+        episodes.push({
+            day: day,
+            title: title,
+            videoId: videoId,
+            markers: markers,
+            filepath: filepath
+        });
+
+        if (itemsLoaded == itemsToLoad) {
+            episodes = episodes.sort(function(a, b) {
+                a.day.localeCompare(b.day);
+            });
+            ready = true;
+            runSearch();
+        }
+    });
+    xhr.open("GET", filepath);
+    xhr.setRequestHeader("Content-Type", "text/plain");
+    xhr.send();
+}
+
+function markerTime(totalTime) {
+    var markTime = "(";
+    var hours = Math.floor(totalTime / 60 / 60);
+    var minutes = Math.floor(totalTime / 60) % 60;
+    var seconds = totalTime % 60;
+    if (hours > 0) {
+        markTime += padTimeComponent(hours) + ":";
+    }
+
+    markTime += padTimeComponent(minutes) + ":" + padTimeComponent(seconds) + ")";
+
+    return markTime;
+}
+
+function padTimeComponent(component) {
+    return (component < 10 ? "0" + component : component);
+}
+
+function runSearch() {
+    var resultsContainer = document.getElementById("results");
+    var queryStr = document.getElementById("query").value;
+    resultsContainer.innerHTML = "";
+    if (ready && queryStr && queryStr.length > 2) {
+        var query = new RegExp(queryStr, "gi");
+        var totalResults = 0;
+        for (var i = 0; i < episodes.length; ++i) {
+            var episode = episodes[i];
+            var matches = [];
+            for (var j = 0; j < episode.markers.length; ++j) {
+                if (episode.markers[j].text.search(query) > -1) {
+                    matches.push(episode.markers[j]);
+                }
+            }
+            if (matches.length > 0) {
+                totalResults += matches.length;
+                var dayContainer = document.createElement("DIV");
+                dayContainer.classList.add("dayContainer");
+
+                var dayName = document.createElement("SPAN");
+                dayName.textContent = episode.day + ": " + episode.title;
+                dayName.classList.add("dayName");
+                dayContainer.appendChild(dayName);
+
+                var markerList = document.createElement("DIV");
+                markerList.classList.add("markerList");
+                dayContainer.appendChild(markerList);
+
+                for (var k = 0; k < matches.length; ++k) {
+                    var marker = document.createElement("DIV");
+                    marker.classList.add("marker");
+                    marker.innerHTML = markerTime(matches[k].totalTime) + " " + matches[k].text.replace(query, "<b>$&</b>");
+                    markerList.appendChild(marker);
+                }
+                resultsContainer.appendChild(dayContainer);
+            }
+
+            if (false && totalResults > 50) {
+                break;
+            }
+        }
+
+        if (false && totalResults > 50) {
+            var notice = document.createElement("DIV");
+            notice.classList.add("notice");
+            notice.textContent = "Too many results... Showing the first 50 or so";
+            resultsContainer.appendChild(notice);
+        }
+    }
+}
+
+fileListsToLoad = 3;
+var script = document.createElement("SCRIPT");
+script.setAttribute("src", "https://api.github.com/repos/HandmadeCompanion/HandmadeCompanion/contents/src/documents/videos/code?callback=fileListLoaded");
+document.body.appendChild(script);
+
+var script = document.createElement("SCRIPT");
+script.setAttribute("src", "https://api.github.com/repos/HandmadeCompanion/HandmadeCompanion/contents/src/documents/videos/chat?callback=fileListLoaded");
+document.body.appendChild(script);
+
+var script = document.createElement("SCRIPT");
+script.setAttribute("src", "https://api.github.com/repos/HandmadeCompanion/HandmadeCompanion/contents/src/documents/videos/misc?callback=fileListLoaded");
+document.body.appendChild(script);
+
+var queryEl = document.getElementById("query")
+queryEl.addEventListener("input", function(ev) {
+    runSearch();
+});
+</script>
+</body>
+</html>
