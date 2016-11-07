@@ -112,6 +112,25 @@ var itemsToLoad = 0;
 var itemsLoaded = 0;
 var ready = false;
 
+var resultsToRender = [];
+var resultsIndex = 0;
+var resultsContainer = document.getElementById("results");
+var rendering = false;
+
+var dayContainerPrototype = document.createElement("DIV");
+dayContainerPrototype.classList.add("dayContainer");
+
+var dayNamePrototype = document.createElement("SPAN");
+dayNamePrototype.classList.add("dayName");
+dayContainerPrototype.appendChild(dayNamePrototype);
+
+var markerListPrototype = document.createElement("DIV");
+markerListPrototype.classList.add("markerList");
+dayContainerPrototype.appendChild(markerListPrototype);
+
+var markerPrototype = document.createElement("DIV");
+markerPrototype.classList.add("marker");
+
 var fileList = [];
 
 var episodes = [];
@@ -191,8 +210,9 @@ function addFile(name, filepath, idx) {
 
         if (itemsLoaded == itemsToLoad) {
             episodes = episodes.sort(function(a, b) {
-                a.day.localeCompare(b.day);
+                return a.day.localeCompare(b.day);
             });
+            episodes.reverse();
             ready = true;
             runSearch();
         }
@@ -221,12 +241,12 @@ function padTimeComponent(component) {
 }
 
 function runSearch() {
-    var resultsContainer = document.getElementById("results");
     var queryStr = document.getElementById("query").value;
     resultsContainer.innerHTML = "";
-    if (ready && queryStr && queryStr.length > 2) {
+    resultsToRender = [];
+    resultsIndex = 0;
+    if (ready && queryStr && queryStr.length > 0) {
         var query = new RegExp(queryStr, "gi");
-        var totalResults = 0;
         for (var i = 0; i < episodes.length; ++i) {
             var episode = episodes[i];
             var matches = [];
@@ -236,41 +256,59 @@ function runSearch() {
                 }
             }
             if (matches.length > 0) {
-                totalResults += matches.length;
-                var dayContainer = document.createElement("DIV");
-                dayContainer.classList.add("dayContainer");
-
-                var dayName = document.createElement("SPAN");
+                resultsToRender.push({
+                    query: query,
+                    episode: episode,
+                    matches: matches
+                });
+                /*
+                var dayContainer = dayContainerPrototype.cloneNode(true);
+                var dayName = dayContainer.children[0];
+                var markerList = dayContainer.children[1];
                 dayName.textContent = episode.day + ": " + episode.title;
-                dayName.classList.add("dayName");
-                dayContainer.appendChild(dayName);
-
-                var markerList = document.createElement("DIV");
-                markerList.classList.add("markerList");
-                dayContainer.appendChild(markerList);
 
                 for (var k = 0; k < matches.length; ++k) {
-                    var marker = document.createElement("DIV");
-                    marker.classList.add("marker");
+                    var marker = markerPrototype.cloneNode();
                     marker.innerHTML = markerTime(matches[k].totalTime) + " " + matches[k].text.replace(query, "<b>$&</b>");
                     markerList.appendChild(marker);
                 }
                 resultsContainer.appendChild(dayContainer);
-            }
-
-            if (false && totalResults > 50) {
-                break;
+                */
             }
         }
-
-        if (false && totalResults > 50) {
-            var notice = document.createElement("DIV");
-            notice.classList.add("notice");
-            notice.textContent = "Too many results... Showing the first 50 or so";
-            resultsContainer.appendChild(notice);
+        if (!rendering) {
+            renderResults();
         }
     }
 }
+
+function renderMatches(query, episode, matches) {
+    var dayContainer = dayContainerPrototype.cloneNode(true);
+    var dayName = dayContainer.children[0];
+    var markerList = dayContainer.children[1];
+    dayName.textContent = episode.day + ": " + episode.title;
+
+    for (var k = 0; k < matches.length; ++k) {
+        var marker = markerPrototype.cloneNode();
+        marker.innerHTML = markerTime(matches[k].totalTime) + " " + matches[k].text.replace(query, "<b>$&</b>");
+        markerList.appendChild(marker);
+    }
+    resultsContainer.appendChild(dayContainer);
+}
+
+function renderResults() {
+    if (resultsIndex < resultsToRender.length) {
+        rendering = true;
+        for (var i = 0; i < 5 && resultsIndex < resultsToRender.length; ++i) {
+            renderMatches(resultsToRender[resultsIndex].query, resultsToRender[resultsIndex].episode, resultsToRender[resultsIndex].matches);
+            resultsIndex++;
+        }
+        requestAnimationFrame(renderResults);
+    } else {
+        rendering = false;
+    }
+}
+
 
 fileListsToLoad = 3;
 var script = document.createElement("SCRIPT");
