@@ -248,6 +248,7 @@ function runSearch() {
     resultsIndex = 0;
     var numEpisodes = 0;
     var numMarkers = 0;
+    var totalSeconds = 0;
     if (ready) {
         if (queryStr && queryStr.length > 0) {
             var query = new RegExp(queryStr, "gi");
@@ -258,6 +259,9 @@ function runSearch() {
                     if (episode.markers[j].text.search(query) > -1) {
                         numMarkers++;
                         matches.push(episode.markers[j]);
+                        if (j < episode.markers.length-1) {
+                            totalSeconds += episode.markers[j+1].totalTime - episode.markers[j].totalTime;
+                        }
                     }
                 }
                 if (matches.length > 0) {
@@ -275,7 +279,9 @@ function runSearch() {
             }
         }
 
-        document.getElementById("resultsSummary").textContent = "Found: " + numEpisodes + " episodes, " + numMarkers + " markers.";
+        var totalTime = Math.floor(totalSeconds/60/60) + "h " + Math.floor(totalSeconds/60)%60 + "m " + totalSeconds%60 + "s ";
+
+        document.getElementById("resultsSummary").textContent = "Found: " + numEpisodes + " episodes, " + numMarkers + " markers, " + totalTime + "total.";
     }
 }
 
