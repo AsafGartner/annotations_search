@@ -71,6 +71,9 @@
         padding: 10px 5px;
         cursor: pointer;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
+        display: block;
+        text-decoration: none;
+        color: #ddd;
     }
 
     .marker:first-child {
@@ -129,8 +132,9 @@ var markerListPrototype = document.createElement("DIV");
 markerListPrototype.classList.add("markerList");
 dayContainerPrototype.appendChild(markerListPrototype);
 
-var markerPrototype = document.createElement("DIV");
+var markerPrototype = document.createElement("A");
 markerPrototype.classList.add("marker");
+markerPrototype.setAttribute("target", "_blank");
 
 var fileList = [];
 
@@ -294,6 +298,7 @@ function renderMatches(query, episode, matches) {
     for (var k = 0; k < matches.length; ++k) {
         var marker = markerPrototype.cloneNode();
         marker.innerHTML = markerTime(matches[k].totalTime) + " " + matches[k].text.replace(query, "<b>$&</b>");
+        marker.setAttribute("href", "http://asafgartner.github.io/annotations_player/player.html#" + episode.filepath + "#" + matches[k].totalTime);
         markerList.appendChild(marker);
     }
     resultsContainer.appendChild(dayContainer);
