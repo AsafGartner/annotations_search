@@ -118,6 +118,7 @@ var ready = false;
 
 var resultsToRender = [];
 var resultsIndex = 0;
+var benchData = 0;
 var resultsContainer = document.getElementById("results");
 var rendering = false;
 
@@ -135,6 +136,8 @@ dayContainerPrototype.appendChild(markerListPrototype);
 var markerPrototype = document.createElement("A");
 markerPrototype.classList.add("marker");
 markerPrototype.setAttribute("target", "_blank");
+
+var highlightPrototype = document.createElement("B");
 
 var fileList = [];
 
@@ -179,7 +182,7 @@ function addFile(name, filepath, idx) {
         var videoId = null;
         var markers = [];
         var day = name.slice(0, name.indexOf("."));
-        dayParts = day.match(/([a-zA-Z_-]+)([0-9]+)?([a-zA-Z]+)?/);
+        var dayParts = day.match(/([a-zA-Z_-]+)([0-9]+)?([a-zA-Z]+)?/);
         day = dayParts[1].slice(0, 1).toUpperCase() + dayParts[1].slice(1) + (dayParts[2] ? " " + dayParts[2] : "") + (dayParts[3] ? " " + dayParts[3].toUpperCase() : "");
         var mode = "none";
         for (var i = 0; i < lines.length; ++i) {
@@ -197,8 +200,10 @@ function addFile(name, filepath, idx) {
                 if (match == null) {
                     console.log(name, line);
                 } else {
+                    var totalTime = (match[2] ? parseInt(match[2], 10) : 0) * 60 * 60 + parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
                     var marker = {
-                        totalTime: (match[2] ? parseInt(match[2], 10) : 0) * 60 * 60 + parseInt(match[3], 10) * 60 + parseInt(match[4], 10),
+                        totalTime: totalTime,
+                        prettyTime: markerTime(totalTime),
                         text: match[5].replace(/\\"/g, "\"")
                     }
                     markers.push(marker);
@@ -210,6 +215,7 @@ function addFile(name, filepath, idx) {
             title: title,
             videoId: videoId,
             markers: markers,
+            filename: name.slice(0, name.indexOf(".")),
             filepath: filepath
         });
 
@@ -247,20 +253,25 @@ function padTimeComponent(component) {
 
 function runSearch() {
     var queryStr = document.getElementById("query").value;
-    resultsContainer.innerHTML = "";
+    while (resultsContainer.firstChild) {
+        resultsContainer.removeChild(resultsContainer.firstChild);
+    }
     resultsToRender = [];
     resultsIndex = 0;
+    benchData = 0;
     var numEpisodes = 0;
     var numMarkers = 0;
     var totalSeconds = 0;
     if (ready) {
         if (queryStr && queryStr.length > 0) {
-            var query = new RegExp(queryStr, "gi");
+            var query = new RegExp(queryStr.replace("(", "\\(").replace(")", "\\)").replace(/(^|[^\\])\\$/, "$1"), "gi");
             for (var i = 0; i < episodes.length; ++i) {
                 var episode = episodes[i];
                 var matches = [];
                 for (var j = 0; j < episode.markers.length; ++j) {
-                    if (episode.markers[j].text.search(query) > -1) {
+                    query.lastIndex = 0;
+                    var result = query.exec(episode.markers[j].text);
+                    if (result && result[0].length > 0) {
                         numMarkers++;
                         matches.push(episode.markers[j]);
                         if (j < episode.markers.length-1) {
@@ -297,8 +308,25 @@ function renderMatches(query, episode, matches) {
 
     for (var k = 0; k < matches.length; ++k) {
         var marker = markerPrototype.cloneNode();
-        marker.innerHTML = markerTime(matches[k].totalTime) + " " + matches[k].text.replace(query, "<b>$&</b>");
-        marker.setAttribute("href", "http://asafgartner.github.io/annotations_player/player.html#" + episode.filepath + "#" + matches[k].totalTime);
+        marker.setAttribute("href", "http://asafgartner.github.io/annotations_player/hmh.html#" + episode.filename + "#" + matches[k].totalTime);
+        query.lastIndex = 0;
+        var cursor = 0;
+        var text = matches[k].text;
+        var result = null;
+        marker.appendChild(document.createTextNode(matches[k].prettyTime + " "));
+        while (result = query.exec(text)) {
+            if (result.index > cursor) {
+                marker.appendChild(document.createTextNode(text.slice(cursor, result.index)));
+            }
+            var highlightEl = highlightPrototype.cloneNode();
+            highlightEl.textContent = result[0];
+            marker.appendChild(highlightEl);
+            cursor = result.index + result[0].length;
+        }
+
+        if (cursor < text.length) {
+            marker.appendChild(document.createTextNode(text.slice(cursor, text.length)));
+        }
         markerList.appendChild(marker);
     }
     resultsContainer.appendChild(dayContainer);
@@ -307,16 +335,18 @@ function renderMatches(query, episode, matches) {
 function renderResults() {
     if (resultsIndex < resultsToRender.length) {
         rendering = true;
-        for (var i = 0; i < 5 && resultsIndex < resultsToRender.length; ++i) {
+        var renderStart = performance.now();
+        while (resultsIndex < resultsToRender.length && performance.now() - renderStart < 1) {
             renderMatches(resultsToRender[resultsIndex].query, resultsToRender[resultsIndex].episode, resultsToRender[resultsIndex].matches);
             resultsIndex++;
         }
+        benchData++;
         requestAnimationFrame(renderResults);
     } else {
         rendering = false;
+        console.log("Num frames:", benchData, "Average items:", resultsToRender.length / benchData);
     }
 }
-
 
 fileListsToLoad = 3;
 var script = document.createElement("SCRIPT");
