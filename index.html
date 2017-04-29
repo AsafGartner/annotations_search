@@ -130,6 +130,7 @@ var lastEpisodeIdxLoaded = -1;
 var lastQuery = null;
 var resultsToRender = [];
 var resultsIndex = 0;
+var resultsMarkerIndex = 0;
 var resultsContainer = document.getElementById("results");
 var rendering = false;
 
@@ -297,6 +298,7 @@ function runSearch() {
             resultsContainer.removeChild(resultsContainer.firstChild);
         }
         resultsIndex = 0;
+        resultsMarkerIndex = 0;
     }
     lastQuery = queryStr;
     resultsToRender = [];
@@ -339,20 +341,30 @@ function runSearch() {
     document.getElementById("resultsSummary").textContent = "Found: " + numEpisodes + " episodes, " + numMarkers + " markers, " + totalTime + "total.";
 }
 
-function renderMatches(query, episode, matches) {
-    var dayContainer = dayContainerPrototype.cloneNode(true);
-    var dayName = dayContainer.children[0];
-    var markerList = dayContainer.children[1];
-    dayName.textContent = episode.day + ": " + episode.title;
+function renderMatches(renderStart) {
+    var query = resultsToRender[resultsIndex].query;
+    var episode = resultsToRender[resultsIndex].episode;
+    var matches = resultsToRender[resultsIndex].matches;
+    var markerList = null;
+    if (resultsMarkerIndex == 0) {
+        var dayContainer = dayContainerPrototype.cloneNode(true);
+        var dayName = dayContainer.children[0];
+        markerList = dayContainer.children[1];
+        dayName.textContent = episode.day + ": " + episode.title;
+        resultsContainer.appendChild(dayContainer);
+    } else {
+        markerList = document.querySelector("#results > .dayContainer:nth-child(" + (resultsIndex+1) + ") .markerList");
+    }
 
-    for (var k = 0; k < matches.length; ++k) {
+    do {
+        var match = matches[resultsMarkerIndex];
         var marker = markerPrototype.cloneNode();
-        marker.setAttribute("href", "http://asafgartner.github.io/annotations_player/hmh.html#" + episode.filename + "#" + matches[k].totalTime);
+        marker.setAttribute("href", "http://asafgartner.github.io/annotations_player/hmh.html#" + episode.filename + "#" + match.totalTime);
         query.lastIndex = 0;
         var cursor = 0;
-        var text = matches[k].text;
+        var text = match.text;
         var result = null;
-        marker.appendChild(document.createTextNode(matches[k].prettyTime + " "));
+        marker.appendChild(document.createTextNode(match.prettyTime + " "));
         while (result = query.exec(text)) {
             if (result.index > cursor) {
                 marker.appendChild(document.createTextNode(text.slice(cursor, result.index)));
@@ -367,8 +379,10 @@ function renderMatches(query, episode, matches) {
             marker.appendChild(document.createTextNode(text.slice(cursor, text.length)));
         }
         markerList.appendChild(marker);
-    }
-    resultsContainer.appendChild(dayContainer);
+        resultsMarkerIndex++;
+    } while (resultsMarkerIndex < matches.length && performance.now() - renderStart < 1);
+
+    return resultsMarkerIndex == matches.length;
 }
 
 function renderResults() {
@@ -376,8 +390,11 @@ function renderResults() {
         rendering = true;
         var renderStart = performance.now();
         while (resultsIndex < resultsToRender.length && performance.now() - renderStart < 1) {
-            renderMatches(resultsToRender[resultsIndex].query, resultsToRender[resultsIndex].episode, resultsToRender[resultsIndex].matches);
-            resultsIndex++;
+            var done = renderMatches(renderStart);
+            if (done) {
+                resultsMarkerIndex = 0;
+                resultsIndex++;
+            }
         }
         requestAnimationFrame(renderResults);
     } else {
