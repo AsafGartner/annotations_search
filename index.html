@@ -294,9 +294,10 @@ function padTimeComponent(component) {
 function runSearch() {
     var queryStr = document.getElementById("query").value;
     if (lastQuery != queryStr) {
-        while (resultsContainer.firstChild) {
-            resultsContainer.removeChild(resultsContainer.firstChild);
-        }
+        var oldResultsContainer = resultsContainer;
+        resultsContainer = oldResultsContainer.cloneNode(false);
+        oldResultsContainer.parentNode.insertBefore(resultsContainer, oldResultsContainer);
+        oldResultsContainer.remove();
         resultsIndex = 0;
         resultsMarkerIndex = 0;
     }
