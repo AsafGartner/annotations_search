@@ -1,0 +1,90 @@
+body {
+    background-color: #222;
+    font-family: sans-serif;
+    color: #ddd;
+    overflow-y: scroll;
+}
+
+h2 {
+    text-align: center;
+}
+
+#loadingContainer {
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+.queryContainer {
+    width: 1000px;
+    margin: 15px auto;
+    display: flex;
+    flex-direction: horizontal;
+}
+
+.queryContainer label {
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+#query {
+    flex-grow: 1;
+}
+
+#results {
+    width: 800px;
+    margin: 0 auto;
+}
+
+.dayContainer {
+    background-color: #161616;
+}
+
+.dayContainer:nth-child(2n) {
+    background-color: #303030;
+}
+
+.dayName {
+    width: 200px;
+    display: inline-block;
+    vertical-align: top;
+    color: #8A877D;
+    font-size: 12px;
+    line-height: 16px;
+    box-sizing: border-box;
+    padding: 5px;
+}
+
+.markerList {
+    display: inline-block;
+    width: 600px;
+    box-sizing: border-box;
+    vertical-align: top;
+}
+
+.marker {
+    padding: 10px 5px;
+    cursor: pointer;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: block;
+    text-decoration: none;
+    color: #ddd;
+}
+
+.marker:first-child {
+    border: none;
+}
+
+.marker b {
+    color: black;
+    background-color: rgb(255, 155, 0);
+}
+
+.marker:hover {
+    background-color: #444;
+}
+
+#resultsSummary {
+    text-align: center;
+    margin: 10px 0;
+}
