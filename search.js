@@ -247,7 +247,8 @@ function renderMatches(renderStart) {
     do {
         var match = matches[resultsMarkerIndex];
         var marker = markerPrototype.cloneNode();
-        marker.setAttribute("href", "http://asafgartner.github.io/annotations_player/hmh.html#" + episode.filename + "#" + match.totalTime);
+        var baseurl = window.annotation_viewer_base_url;
+        marker.setAttribute("href", baseurl + episode.filename + "#" + match.totalTime);
         query.lastIndex = 0;
         var cursor = 0;
         var text = match.text;
