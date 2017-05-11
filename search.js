@@ -50,6 +50,12 @@ function getEpisodeName(filename) {
     return day;
 }
 
+function getPartialPath(filepath) {
+    var result = filepath.slice(filepath.lastIndexOf("/", filepath.lastIndexOf("/") - 1) + 1)
+    result = result.slice(0, result.indexOf("."));
+    return result;
+}
+
 function sortDays(dayA, dayB) {
     return dayB.localeCompare(dayA);
 }
@@ -123,7 +129,8 @@ function episodeFileLoaded(name, filepath, idx, contents) {
         videoId: videoId,
         markers: markers,
         filename: name.slice(0, name.indexOf(".")),
-        filepath: filepath
+        filepath: filepath,
+        partial_path: getPartialPath(filepath),
     };
 
     dataAtIdxReady(idx);
@@ -248,7 +255,7 @@ function renderMatches(renderStart) {
         var match = matches[resultsMarkerIndex];
         var marker = markerPrototype.cloneNode();
         var baseurl = window.annotation_viewer_base_url;
-        marker.setAttribute("href", baseurl + episode.filename + "#" + match.totalTime);
+        marker.setAttribute("href", baseurl + episode.partial_path + "#" + match.totalTime);
         query.lastIndex = 0;
         var cursor = 0;
         var text = match.text;
