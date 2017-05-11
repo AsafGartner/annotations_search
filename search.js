@@ -313,7 +313,7 @@ document.body.appendChild(script);
 
 var queryEl = document.getElementById("query")
 queryEl.addEventListener("input", function(ev) {
-    location.hash = encodeURIComponent(queryEl.value);
+    history.replaceState(null, null, "#" + encodeURIComponent(queryEl.value));
     runSearch();
 });
 
