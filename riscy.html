@@ -202,7 +202,7 @@ function episodeFileLoaded(name, filepath, idx, contents) {
     var day = getEpisodeName(name);
     var parsed = HMML_parse(contents);
     if (parsed.error){
-        console.error("Failed to parse", parsed.error);
+        console.error("Failed to parse", name, parsed.error);
         fileList[idx].data = "failed";
         dataAtIdxReady(idx);
     } else {
