@@ -462,15 +462,7 @@ function HMML_parse(contents) {
     var state = {
         line: 0,
         annos: [],
-        meta: {
-            member: "",
-            twitch: "",
-            project: "",
-            title: "",
-            platform: "",
-            id: "",
-            annotator: ""
-        },
+        meta: {},
         an: {
             line: 0,
             time: "",
@@ -484,24 +476,7 @@ function HMML_parse(contents) {
             },
             is_quote: false
         },
-        ref: {
-            site: "",
-            page: "",
-            url: "",
-            title: "",
-            article: "",
-            author: "",
-            editor: "",
-            publisher: "",
-            isbn: "",
-            offset: 0
-        },
-        error: {
-            line: 0,
-            msg: ""
-        },
-        attr: "",
-        mnext: 0,
+        ref: {},
         first: true
     };
     l.setInput(contents, state);
@@ -524,7 +499,7 @@ function HMML_parse(contents) {
         };
     } catch (e) {
         return {
-            error: state.error
+            error: e
         };
     }
 }
@@ -856,14 +831,15 @@ HMMLexer.prototype = {
     },
     performAction: function anonymous(yy, yy_, $avoiding_name_collisions, YY_START) {
         function ERR(yy, err) {
-            console.log(err);
-            yy.error.line = yy.line;
-            yy.error.msg = err;
-            throw "tantrum";
+            console.log("hmmlib error: L%d: %s\n", yy.line, err);
+            throw {
+                message: err,
+                line: yy.line
+            };
         }
 
         function CHECKESCAPE(yy, str) {
-            if (!"[]:@~\\\"".find(str)) {
+            if ("[]:@~\\\"".indexOf(str) == -1) {
                 ERR(yy, "hmmlib: Unknown backslash escape code: %s", str);
             }
         }
@@ -944,338 +920,366 @@ HMMLexer.prototype = {
                 yy_.begin("V_ATTR");
                 break;
             case 6:
-                yy.attr = "twitch";
+                yy.attr = "stream_platform";
                 yy_.begin("V_ATTR");
                 break;
             case 7:
-                yy.attr = "project";
+                yy.attr = "stream_username";
                 yy_.begin("V_ATTR");
                 break;
             case 8:
-                yy.attr = "title";
+                yy.attr = "project";
                 yy_.begin("V_ATTR");
                 break;
             case 9:
-                yy.attr = "platform";
+                yy.attr = "title";
                 yy_.begin("V_ATTR");
                 break;
             case 10:
-                yy.attr = "id";
+                yy.attr = "vod_platform";
                 yy_.begin("V_ATTR");
                 break;
             case 11:
-                yy.attr = "annotator";
+                yy.attr = "id";
                 yy_.begin("V_ATTR");
                 break;
             case 12:
-                yy_.begin("ANNOTATION");
+                yy.attr = "co_host"
+                yy_.begin("V_ATTR");
                 break;
             case 13:
-                ERR(yy, "Invalid char '" + yy_.yytext + "' in video tag.");
+                yy.attr = "guest"
+                yy_.begin("V_ATTR");
                 break;
             case 14:
-                yy_.begin("VIDEO");
+                yy.attr = "annotator";
+                yy_.begin("V_ATTR");
                 break;
             case 15:
-                yy.meta[yy.attr] = yy_.yytext;
-                yy_.begin("VIDEO");
+                yy_.begin("ANNOTATION");
                 break;
             case 16:
-                yy.meta[yy.attr] = UNQUOTE(yy, yy_.yytext.substr(1, yy_.yyleng - 2));
-                yy_.begin("VIDEO");
+                ERR(yy, "Invalid char '" + yy_.yytext + "' in video tag.");
                 break;
             case 17:
-                yy_.less(0);
                 yy_.begin("VIDEO");
                 break;
             case 18:
+                yy.meta[yy.attr] = yy_.yytext;
+                yy_.begin("VIDEO");
+                break;
+            case 19:
+                yy.meta[yy.attr] = UNQUOTE(yy, yy_.yytext.substr(1, yy_.yyleng - 2));
+                yy_.begin("VIDEO");
+                break;
+            case 20:
+                yy_.less(0);
+                yy_.begin("VIDEO");
+                break;
+            case 21:
+                NEWANNO(yy);
+                return 1;
+                break;
+            case 22:
                 NEWANNO(yy);
                 yy.an.time = yy_.yytext.substr(1, yy_.yyleng - 4);
                 yy_.begin("AUTHOR");
                 break;
-            case 19:
+            case 23:
                 NEWANNO(yy);
                 yy.an.time = yy_.yytext.substr(1, yy_.yyleng - 2);
                 yy_.begin("TEXT_START");
                 break;
-            case 20:
+            case 24:
                 ERR(yy, "Timecode '" + yy_.yytext + "' out of range.");
                 break;
-            case 21:
+            case 25:
                 break;
-            case 22:
+            case 26:
                 ERR(yy, "Cannot parse annotation. Expected timecode.");
                 break;
-            case 23:
+            case 27:
                 M_(yy, "CATEGORY", "TEXT");
                 yy_.begin("MARKER");
                 break;
-            case 24:
+            case 28:
                 M_(yy, "MEMBER", "TEXT");
                 yy_.begin("MARKER");
                 break;
-            case 25:
+            case 29:
                 M_(yy, "PROJECT", "TEXT");
                 yy_.begin("MARKER");
                 break;
-            case 26:
+            case 30:
                 yy_.less(0);
                 yy_.begin("TEXT");
                 break;
-            case 27:
+            case 31:
                 ERR(yy, "Unknown character '" + yy_.yytext + "' after timecode.");
                 break;
-            case 28:
+            case 32:
                 yy.an.text += yy_.yytext;
                 break;
-            case 29:
+            case 33:
                 CHECKESCAPE(yy, yy_.yytext.charAt(1));
                 yy.an.text += yy_.yytext.substr(1, yy_.yyleng - 1);
                 break;
-            case 30:
+            case 34:
                 yy.an.text += ' ';
                 M_(yy, "CATEGORY", "TEXT");
                 yy_.begin("MARKER");
                 break;
-            case 31:
+            case 35:
                 yy.an.text += ' ';
                 M_(yy, "MEMBER", "TEXT");
                 yy_.begin("MARKER");
                 break;
-            case 32:
+            case 36:
                 yy.an.text += ' ';
                 M_(yy, "PROJECT", "TEXT");
                 yy_.begin("MARKER");
                 break;
-            case 33:
+            case 37:
                 M_(yy, "CATEGORY", "MARKER_XTRA");
                 yy_.begin("MARKER");
                 break;
-            case 34:
+            case 38:
                 M_(yy, "MEMBER", "MARKER_XTRA");
                 yy_.begin("MARKER");
                 break;
-            case 35:
+            case 39:
                 M_(yy, "PROJECT", "MARKER_XTRA");
                 yy_.begin("MARKER");
                 break;
-            case 36:
+            case 40:
                 yy_.begin("AFTERTEXT");
                 break;
-            case 37:
+            case 41:
                 yy.ref.offset = yy.an.text.length;
                 yy_.begin("REF");
                 break;
-            case 38:
+            case 42:
                 break;
-            case 39:
+            case 43:
                 yy.an.text += ' ';
                 break;
-            case 40:
+            case 44:
                 yy.an.text += yy_.yytext;
                 break;
-            case 41:
+            case 45:
                 M_ADD(yy, yy_.yytext);
                 yy_.begin(yy.mnext);
                 break;
-            case 42:
+            case 46:
                 M_ADD(yy, yy_.yytext.substr(1, yy_.yyleng - 2));
                 yy_.begin(yy.mnext);
                 break;
-            case 43:
+            case 47:
                 ERR(yy, "Cannot parse Marker. Expected quoted or alphanumeric attribute.");
                 break;
-            case 44:
+            case 48:
                 MX_ADD(yy, ']');
                 break;
-            case 45:
+            case 49:
+                MX_ADD(yy, '#');
+                break;
+            case 50:
                 yy_.begin("TEXT");
                 break;
-            case 46:
+            case 51:
                 if (yy.an.markers[yy.an.markers.length - 1].parameter) {
                     MX_ADD(yy, ' ');
                 }
                 break;
-            case 47:
+            case 52:
+                var m = yy.an.markers[yy.an.markers.length - 1];
+                if (m.type == "PROJECT") {
+                    m.episode = yy_.yytext.substr(2);
+                } else {
+                    MX_ADD(yy_.yytext.substr(1));
+                }
+
+                break;
+            case 53:
                 MX_ADD(yy, yy_.yytext);
                 break;
-            case 48:
+            case 54:
                 break;
-            case 49:
+            case 55:
                 yy.attr = "site";
                 yy_.begin("R_ATTR");
                 break;
-            case 50:
+            case 56:
                 yy.attr = "page";
                 yy_.begin("R_ATTR");
                 break;
-            case 51:
+            case 57:
                 yy.attr = "url";
                 yy_.begin("R_ATTR");
                 break;
-            case 52:
+            case 58:
                 yy.attr = "title";
                 yy_.begin("R_ATTR");
                 break;
-            case 53:
+            case 59:
                 yy.attr = "article";
                 yy_.begin("R_ATTR");
                 break;
-            case 54:
+            case 60:
                 yy.attr = "author";
                 yy_.begin("R_ATTR");
                 break;
-            case 55:
+            case 61:
                 yy.attr = "editor";
                 yy_.begin("R_ATTR");
                 break;
-            case 56:
+            case 62:
                 yy.attr = "publisher";
                 yy_.begin("R_ATTR");
                 break;
-            case 57:
+            case 63:
                 yy.attr = "isbn";
                 yy_.begin("R_ATTR");
                 break;
-            case 58:
+            case 64:
                 yy.an.references.push(yy.ref);
                 yy.ref = {};
                 yy_.begin("TEXT");
                 break;
-            case 59:
+            case 65:
                 ERR(yy, "Unexpected item in ref: " + yy_.yytext);
                 break;
-            case 60:
+            case 66:
                 break;
-            case 61:
+            case 67:
                 yy.ref[yy.attr] = yy_.yytext;
                 yy_.begin("REF");
                 break;
-            case 62:
+            case 68:
                 yy.ref[yy.attr] = UNQUOTE(yy, yy_.yytext.substr(1, yy_.yyleng - 2));
                 yy_.begin("REF");
                 break;
-            case 63:
+            case 69:
                 NEWANNO(yy);
                 return 1;
                 break;
-            case 64:
+            case 70:
                 break;
-            case 65:
+            case 71:
                 yy_.begin("QUOTES");
                 break;
-            case 66:
+            case 72:
                 yy_.begin("CATEGORIES");
                 yy_.less(1);
                 break;
-            case 67:
+            case 73:
                 yy_.begin("ANNOTATION");
                 yy_.less(0);
                 break;
-            case 68:
+            case 74:
                 ERR(yy, "Unexpected thing after text node: " + yy_.yytext);
                 break;
-            case 69:
+            case 75:
                 ERR(yy, "Unexpected thing after text node: " + yy_.yytext);
                 break;
-            case 70:
+            case 76:
                 yy.an.author = yy_.yytext.substr(0, yy_.yyleng - 1);
                 yy_.begin("TEXT_START");
                 break;
-            case 71:
+            case 77:
                 break;
-            case 72:
+            case 78:
                 break;
-            case 73:
+            case 79:
                 yy.an.markers.push({
                     type: "CATEGORY",
                     marker: yy_.yytext.substr(1, yy_.yyleng - 1),
                     offset: -1
                 });
                 break;
-            case 74:
+            case 80:
                 yy.an.markers.push({
                     type: "CATEGORY",
                     marker: UNQUOTE(yy, yy_.yytext.substr(2, yy_.yyleng - 3)),
                     offset: -1
                 });
                 break;
-            case 75:
+            case 81:
                 yy_.begin("QUOTES");
                 break;
-            case 76:
+            case 82:
                 yy_.begin("ANNOTATION");
                 break;
-            case 77:
+            case 83:
                 ERR(yy, "Unexpected character in category tag: " + yy_.yytext);
                 break;
-            case 78:
+            case 84:
                 break;
-            case 79:
+            case 85:
                 yy.an.is_quote = true;
                 yy.an.quote.id = parseInt(yy_.yytext);
                 yy_.begin("ANNOTATION");
                 break;
-            case 80:
+            case 86:
                 yy.an.quote.author += yy_.yytext;
                 break;
-            case 81:
+            case 87:
                 ERR(yy, "Unexpected character in quotes tag: " + yy_.yytext);
                 break;
         }
     },
-    rules: [/^(?:$)/, /^(?:\r\n|\n)/, /^(?:(\[video\b))/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:member([\t \r]*)=)/, /^(?:twitch_username([\t \r]*)=)/, /^(?:project([\t \r]*)=)/, /^(?:title([\t \r]*)=)/, /^(?:platform([\t \r]*)=)/, /^(?:id([\t \r]*)=)/, /^(?:annotator([\t \r]*)=)/, /^(?:\])/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:([^\" \]\t\r\n][^ \]\t\r\n]*))/, /^(?:("([^\n\"\\]|\\.)*"))/, /^(?:\])/, /^(?:(\[[0-9]{1,2}(:[0-5][0-9]){1,2}\])(\[)@)/, /^(?:(\[[0-9]{1,2}(:[0-5][0-9]){1,2}\]))/, /^(?:(\[[0-9]{1,2}(:[6-9][0-9]){1,2}\]))/, /^(?:([\t \r]+))/, /^(?:.)/, /^(?:(\[):)/, /^(?:(\[)@)/, /^(?:(\[)~)/, /^(?:(\[))/, /^(?:.)/, /^(?:([^\\\:\@\~\[\]\r\n\t ])+)/, /^(?:\\.)/, /^(?:[ \r\t]+:)/, /^(?:[ \r\t]+@)/, /^(?:[ \r\t]+~)/, /^(?:(\[):)/, /^(?:(\[)@)/, /^(?:(\[)~)/, /^(?:\])/, /^(?:(\[)ref\b)/, /^(?:(\[))/, /^(?:([\t \r]+))/, /^(?:.)/, /^(?:([0-9a-zA-Z][0-9a-zA-Z_]*))/, /^(?:("([^\n\"\\]|\\.)*"))/, /^(?:.)/, /^(?:\\)/, /^(?:\])/, /^(?:[ ])/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:site([\t \r]*)=)/, /^(?:page([\t \r]*)=)/, /^(?:url([\t \r]*)=)/, /^(?:title([\t \r]*)=)/, /^(?:article([\t \r]*)=)/, /^(?:author([\t \r]*)=)/, /^(?:editor([\t \r]*)=)/, /^(?:publisher([\t \r]*)=)/, /^(?:isbn([\t \r]*)=)/, /^(?:\])/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:([^\" \]\t\r\n][^ \]\t\r\n]*))/, /^(?:("([^\n\"\\]|\\.)*"))/, /^(?:\[\/video\])/, /^(?:([\t \r]+))/, /^(?:(\[)quote\b)/, /^(?:(\[):)/, /^(?:(\[)[0-9])/, /^(?:..)/, /^(?:.)/, /^(?:[^\]\n]+\])/, /^(?:([\t \r]+))/, /^(?:([\t \r]+))/, /^(?::([^\" \]\t\r\n][^ \]\t\r\n]*))/, /^(?::("([^\n\"\\]|\\.)*"))/, /^(?:\](\[))/, /^(?:\])/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:[0-9]+([\t \r]*)\])/, /^(?:([0-9a-zA-Z][0-9a-zA-Z_]*))/, /^(?:.)/],
+    rules: [/^(?:$)/, /^(?:\r\n|\n)/, /^(?:(\[video\b))/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:member([\t \r]*)=)/, /^(?:stream_platform([\t \r]*)=)/, /^(?:stream_username([\t \r]*)=)/, /^(?:project([\t \r]*)=)/, /^(?:title([\t \r]*)=)/, /^(?:vod_platform([\t \r]*)=)/, /^(?:id([\t \r]*)=)/, /^(?:co_host([\t \r]*)=)/, /^(?:guest([\t \r]*)=)/, /^(?:annotator([\t \r]*)=)/, /^(?:\])/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:([^\" \]\t\r\n][^ \]\t\r\n]*))/, /^(?:("([^\n\"\\]|\\.)*"))/, /^(?:\])/, /^(?:\[\/video\])/, /^(?:(\[[0-9]{1,2}(:[0-5][0-9]){1,2}\])(\[)@)/, /^(?:(\[[0-9]{1,2}(:[0-5][0-9]){1,2}\]))/, /^(?:(\[[0-9]{1,2}(:[6-9][0-9]){1,2}\]))/, /^(?:([\t \r]+))/, /^(?:.)/, /^(?:(\[):)/, /^(?:(\[)@)/, /^(?:(\[)~)/, /^(?:(\[))/, /^(?:.)/, /^(?:([^\\\:\@\~\[\]\r\n\t ])+)/, /^(?:\\.)/, /^(?:[ \r\t]+:)/, /^(?:[ \r\t]+@)/, /^(?:[ \r\t]+~)/, /^(?:(\[):)/, /^(?:(\[)@)/, /^(?:(\[)~)/, /^(?:\])/, /^(?:(\[)ref\b)/, /^(?:(\[))/, /^(?:([\t \r]+))/, /^(?:.)/, /^(?:([0-9a-zA-Z][0-9a-zA-Z_]*))/, /^(?:("([^\n\"\\]|\\.)*"))/, /^(?:.)/, /^(?:\\)/, /^(?:\\#)/, /^(?:\])/, /^(?:[ ])/, /^(?:[ ]#[0-9]+)/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:site([\t \r]*)=)/, /^(?:page([\t \r]*)=)/, /^(?:url([\t \r]*)=)/, /^(?:title([\t \r]*)=)/, /^(?:article([\t \r]*)=)/, /^(?:author([\t \r]*)=)/, /^(?:editor([\t \r]*)=)/, /^(?:publisher([\t \r]*)=)/, /^(?:isbn([\t \r]*)=)/, /^(?:\])/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:([^\" \]\t\r\n][^ \]\t\r\n]*))/, /^(?:("([^\n\"\\]|\\.)*"))/, /^(?:\[\/video\])/, /^(?:([\t \r]+))/, /^(?:(\[)quote\b)/, /^(?:(\[):)/, /^(?:(\[)[0-9])/, /^(?:..)/, /^(?:.)/, /^(?:[^\]\n]+\])/, /^(?:([\t \r]+))/, /^(?:([\t \r]+))/, /^(?::([^\" \]\t\r\n][^ \]\t\r\n]*))/, /^(?::("([^\n\"\\]|\\.)*"))/, /^(?:\](\[))/, /^(?:\])/, /^(?:.)/, /^(?:([\t \r]+))/, /^(?:[0-9]+([\t \r]*)\])/, /^(?:([0-9a-zA-Z][0-9a-zA-Z_]*))/, /^(?:.)/],
     conditions: {
         "QUOTES": {
-            "rules": [0, 1, 78, 79, 80, 81],
+            "rules": [0, 1, 84, 85, 86, 87],
             "inclusive": true
         },
         "CATEGORIES": {
-            "rules": [0, 1, 72, 73, 74, 75, 76, 77],
+            "rules": [0, 1, 78, 79, 80, 81, 82, 83],
             "inclusive": true
         },
         "AUTHOR": {
-            "rules": [0, 1, 70, 71],
+            "rules": [0, 1, 76, 77],
             "inclusive": true
         },
         "AFTERTEXT": {
-            "rules": [0, 1, 63, 64, 65, 66, 67, 68, 69],
+            "rules": [0, 1, 69, 70, 71, 72, 73, 74, 75],
             "inclusive": true
         },
         "R_ATTR": {
-            "rules": [0, 1, 60, 61, 62],
+            "rules": [0, 1, 66, 67, 68],
             "inclusive": true
         },
         "REF": {
-            "rules": [0, 1, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59],
+            "rules": [0, 1, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65],
             "inclusive": true
         },
         "MARKER_XTRA": {
-            "rules": [0, 1, 44, 45, 46, 47],
+            "rules": [0, 1, 48, 49, 50, 51, 52, 53],
             "inclusive": true
         },
         "MARKER": {
-            "rules": [0, 1, 41, 42, 43],
+            "rules": [0, 1, 45, 46, 47],
             "inclusive": true
         },
         "TEXT": {
-            "rules": [0, 1, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
+            "rules": [0, 1, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44],
             "inclusive": true
         },
         "TEXT_START": {
-            "rules": [0, 1, 23, 24, 25, 26, 27],
+            "rules": [0, 1, 27, 28, 29, 30, 31],
             "inclusive": true
         },
         "ANNOTATION": {
-            "rules": [0, 1, 18, 19, 20, 21, 22, 63],
+            "rules": [0, 1, 21, 22, 23, 24, 25, 26],
             "inclusive": true
         },
         "V_ATTR": {
-            "rules": [0, 1, 14, 15, 16, 17],
+            "rules": [0, 1, 17, 18, 19, 20],
             "inclusive": true
         },
         "VIDEO": {
-            "rules": [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+            "rules": [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
             "inclusive": true
         },
         "INITIAL": {
