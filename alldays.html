@@ -14,12 +14,6 @@
         text-align: center;
     }
 
-    #loadingContainer {
-        position: fixed;
-        top: 0;
-        left: 0;
-    }
-
     .queryContainer {
         width: 1000px;
         margin: 15px auto;
@@ -32,8 +26,26 @@
         flex-shrink: 0;
     }
 
-    #query {
+    .queryContainer .inputContainer {
         flex-grow: 1;
+        position: relative;
+    }
+
+    #query {
+        width: 100%;
+    }
+
+    .spinner {
+        position: absolute;
+        top: 2px;
+        right: 5px;
+        color: black;
+        height: 100%;
+        display: none;
+    }
+
+    .spinner.show {
+        display: block;
     }
 
     #results {
@@ -96,15 +108,15 @@
 </style>
 </head>
 <body>
-<div id="loadingContainer">
-    <span>Loading annotations:</span>
-    <span id="loadingProgress">Getting list of files...</span>
-    <br />
-    <span>You can start typing. Results will stream in as soon as they are available.</span>
-</div>
 <h2>Handmade Hero Annotations Search</h2>
 <div class="queryContainer">
-    <label>Query:</label> <input type="text" id="query" autofocus></input>
+    <label for="query">Query:</label>
+    <div class="inputContainer">
+        <input type="text" id="query" autofocus></input>
+        <div class="spinner">
+            Downloading data...
+        </div>
+    </div>
 </div>
 <div id="resultsSummary"></div>
 <div id="results">
@@ -144,126 +156,13 @@ markerPrototype.setAttribute("target", "_blank");
 
 var highlightPrototype = document.createElement("B");
 
-var fileList = [];
-
 var episodes = [];
 
 function getEpisodeName(filename) {
-    // NOTE(agartner): Expected filename with extension
-    var day = filename.slice(0, filename.indexOf("."));
+    var day = filename;
     var dayParts = day.match(/([a-zA-Z_-]+)([0-9]+)?([a-zA-Z]+)?/);
     day = dayParts[1].slice(0, 1).toUpperCase() + dayParts[1].slice(1) + (dayParts[2] ? " " + dayParts[2] : "") + (dayParts[3] ? " " + dayParts[3].toUpperCase() : "");
     return day;
-}
-
-function sortDays(dayA, dayB) {
-    return dayB.localeCompare(dayA);
-}
-
-function fileListLoaded(data) {
-    fileListsLoaded++;
-    var files = [];
-    for (var i = data.data.length-1; i >= 0; --i) {
-        var file = data.data[i];
-        files.push({
-            name: file.name,
-            day: getEpisodeName(file.name),
-            path: "https://raw.githubusercontent.com/HandmadeCompanion/HandmadeCompanion/master/" + file.path,
-            data: null
-        });
-    }
-    fileList = fileList.concat(files);
-    if (fileListsLoaded == fileListsToLoad) {
-        itemsToLoad = fileList.length;
-        fileList = fileList.sort(function(a, b) {
-            return sortDays(a.day, b.day);
-        });
-        for (var i = 0; i < fileList.length; ++i) {
-            addFile(fileList[i].name, fileList[i].path, i);
-        }
-    }
-}
-
-function episodeFileLoaded(name, filepath, idx, contents) {
-    itemsLoaded++;
-    if (itemsLoaded == itemsToLoad) {
-        document.getElementById("loadingContainer").style.display = "none";
-    } else {
-        document.getElementById("loadingProgress").textContent = itemsLoaded + "/" + itemsToLoad;
-    }
-
-    var lines = contents.split("\n");
-    var title = null;
-    var videoId = null;
-    var markers = [];
-    var day = getEpisodeName(name);
-    var mode = "none";
-    for (var i = 0; i < lines.length; ++i) {
-        var line = lines[i];
-        if (line == "---") {
-            mode = "none";
-        } else if (line.startsWith("title:")) {
-            title = line.slice(7).replace(/"/g, "");
-        } else if (line.startsWith("videoId:")) {
-            videoId = line.slice(9).replace(/"/g, "");
-        } else if (line.startsWith("markers")) {
-            mode = "markers";
-        } else if (mode == "markers") {
-            var match = line.match(/"((\d+):)?(\d+):(\d+)": "(.+)"/);
-            if (match == null) {
-                console.log(name, line);
-            } else {
-                var totalTime = (match[2] ? parseInt(match[2], 10) : 0) * 60 * 60 + parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
-                var marker = {
-                    totalTime: totalTime,
-                    prettyTime: markerTime(totalTime),
-                    text: match[5].replace(/\\"/g, "\"")
-                }
-                markers.push(marker);
-            }
-        }
-    }
-    fileList[idx].data = {
-        day: day,
-        title: title,
-        videoId: videoId,
-        markers: markers,
-        filename: name.slice(0, name.indexOf(".")),
-        filepath: filepath
-    };
-
-    dataAtIdxReady(idx);
-}
-
-function episodeFileFailed(name, filepath, idx) {
-    fileList[idx].data = "failed";
-    dataAtIdxReady(idx);
-}
-
-function dataAtIdxReady(idx) {
-    if (idx == lastEpisodeIdxLoaded + 1) {
-        var i;
-        for (i = idx; fileList[i] && fileList[i].data; ++i) {
-            if (fileList[i].data != "failed") {
-                episodes.push(fileList[i].data);
-            }
-            lastEpisodeIdxLoaded = i;
-        }
-        runSearch();
-    }
-}
-
-function addFile(name, filepath, idx) {
-    var xhr = new XMLHttpRequest();
-    xhr.addEventListener("load", function() {
-        episodeFileLoaded(name, filepath, idx, xhr.response);
-    });
-    xhr.addEventListener("error", function() {
-        episodeFileFailed(name, filepath, idx);
-    });
-    xhr.open("GET", filepath);
-    xhr.setRequestHeader("Content-Type", "text/plain");
-    xhr.send();
 }
 
 function markerTime(totalTime) {
@@ -300,33 +199,37 @@ function runSearch() {
     var numMarkers = 0;
     var totalSeconds = 0;
     if (queryStr && queryStr.length > 0) {
-        var query = new RegExp(queryStr.replace("(", "\\(").replace(")", "\\)").replace(/(^|[^\\])\\$/, "$1"), "gi");
-        for (var i = 0; i < episodes.length; ++i) {
-            var episode = episodes[i];
-            var matches = [];
-            for (var j = 0; j < episode.markers.length; ++j) {
-                query.lastIndex = 0;
-                var result = query.exec(episode.markers[j].text);
-                if (result && result[0].length > 0) {
-                    numMarkers++;
-                    matches.push(episode.markers[j]);
-                    if (j < episode.markers.length-1) {
-                        totalSeconds += episode.markers[j+1].totalTime - episode.markers[j].totalTime;
+        if (episodes.length > 0) {
+            var query = new RegExp(queryStr.replace("(", "\\(").replace(")", "\\)").replace(/(^|[^\\])\\$/, "$1"), "gi");
+            for (var i = 0; i < episodes.length; ++i) {
+                var episode = episodes[i];
+                var matches = [];
+                for (var j = 0; j < episode.markers.length; ++j) {
+                    query.lastIndex = 0;
+                    var result = query.exec(episode.markers[j].text);
+                    if (result && result[0].length > 0) {
+                        numMarkers++;
+                        matches.push(episode.markers[j]);
+                        if (j < episode.markers.length-1) {
+                            totalSeconds += episode.markers[j+1].totalTime - episode.markers[j].totalTime;
+                        }
                     }
                 }
+                if (matches.length > 0) {
+                    numEpisodes++;
+                    resultsToRender.push({
+                        query: query,
+                        episode: episode,
+                        matches: matches
+                    });
+                }
             }
-            if (matches.length > 0) {
-                numEpisodes++;
-                resultsToRender.push({
-                    query: query,
-                    episode: episode,
-                    matches: matches
-                });
-            }
-        }
 
-        if (!rendering) {
-            renderResults();
+            if (!rendering) {
+                renderResults();
+            }
+        } else {
+            document.querySelector(".spinner").classList.add("show");
         }
     }
 
@@ -404,7 +307,6 @@ queryEl.addEventListener("input", function(ev) {
 
 var xhr = new XMLHttpRequest();
 xhr.addEventListener("load", function() {
-    document.getElementById("loadingContainer").style.display = "none";
     var contents = xhr.response;
     var lines = contents.split("\n");
     var mode = "none";
@@ -445,6 +347,7 @@ xhr.addEventListener("load", function() {
             }
         }
     }
+    document.querySelector(".spinner").classList.remove("show");
     runSearch();
 });
 xhr.addEventListener("error", function() {
